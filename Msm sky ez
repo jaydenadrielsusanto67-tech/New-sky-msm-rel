@@ -1,0 +1,62 @@
+repeat task.wait() until game:IsLoaded()
+
+local Lighting = game:GetService("Lighting")
+local RunService = game:GetService("RunService")
+local ContentProvider = game:GetService("ContentProvider")
+
+-- Your custom Roblox asset ID
+local decalId = "rbxassetid://129795170513763"
+
+-- Preload the asset to ensure it registers as a valid raw texture map
+local dummyDecal = Instance.new("Decal")
+dummyDecal.Texture = decalId
+pcall(function()
+    ContentProvider:PreloadAsync({dummyDecal})
+end)
+local rawTextureId = dummyDecal.Texture
+
+local function forceSkyboxOverride()
+    -- Look for any active sky boxes anywhere in Lighting or Workspace
+    local targets = {Lighting, workspace}
+    for _, container in ipairs(targets) do
+        local sky = container:FindFirstChildOfClass("Sky")
+        if not sky then
+            sky = Instance.new("Sky")
+            sky.Parent = container
+        end
+        
+        -- Forcefully swap the textures if they don't match the MSM profile
+        if sky.SkyboxBk ~= rawTextureId then
+            sky.Name = "MsmSkyboxForce"
+            sky.SkyboxBk = rawTextureId
+            sky.SkyboxDn = rawTextureId
+            sky.SkyboxFt = rawTextureId
+            sky.SkyboxLf = rawTextureId
+            sky.SkyboxRt = rawTextureId
+            sky.SkyboxUp = rawTextureId
+            sky.CelestialBodiesShown = false
+        end
+    end
+    
+    -- Clear out standard game Atmosphere bloom filters that wash out colors
+    local atmos = Lighting:FindFirstChildOfClass("Atmosphere")
+    if atmos then
+        atmos.Density = 0 -- Remove background haze fog
+    end
+    
+    -- Dark red environment correction
+    Lighting.Ambient = Color3.fromRGB(45, 0, 0)
+    Lighting.OutdoorAmbient = Color3.fromRGB(25, 0, 0)
+end
+
+-- Run every frame update to actively block Roblox Rivals map scripts from resetting it
+RunService.RenderStepped:Connect(forceSkyboxOverride)
+
+-- Push notice banner to verify initialization
+pcall(function()
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "MSM Sky System",
+        Text = "Forced Render Override Active!",
+        Duration = 4
+    })
+end)
